@@ -79,7 +79,7 @@ Linking against the full `libvte` or building the full `kitty` binary is overkil
 
 ### 2. Why Mocking?
 Early attempts using tools like `xdotool`, `send_key`, or `xtest` to send events to a running terminal window were unreliable.
-*   **Problem:** Timing issues, focus stealing, race conditions, and the overhead of the display server made tests flaky and slow.
+*   **Problem:** Very slow, focus stealing, race conditions, and the overhead of the display server made tests flaky and slow. Also, some xtest'ed key combinations may log you out, send you to the kernel console or burn your house. Also, GTK ignores "synthetic" keyboard events completely.
 *   **Decision:** We mock the environment. We created `kitty_mocks.h` and `vte_key_tester.h` to emulate the necessary structs (`GLFWkeyevent`, `GdkEventKey`) and constants.
 *   **Result:** The tests run in a "headless" CLI environment. They are deterministic, reproducible, and extremely fast (thousands of checks per second).
 
