@@ -1,4 +1,4 @@
-# GNOME VTE vs. kitty keyboard protocol Test Harness
+# Test Harness for kitty keyboard protocol implementation in GNOME VTE
 
 This project is a specialized testing infrastructure designed to verify the implementation of the **kitty keyboard protocol** within **GNOME VTE**.
 
