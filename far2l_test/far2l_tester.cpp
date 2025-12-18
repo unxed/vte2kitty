@@ -188,7 +188,7 @@ int main(int argc, char** argv) {
         // Determine char code
         // For simple letters/numbers:
         if (def.ch != 0) {
-            if (shift) {
+            if (shift || ((ev.dwControlKeyState &= CAPSLOCK_ON) && !shift)) {
                 ev.uChar.UnicodeChar = def.shift_ch;
             } else {
                 ev.uChar.UnicodeChar = def.ch;
