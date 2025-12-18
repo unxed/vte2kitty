@@ -14,11 +14,25 @@ MISMATCH_LOG_FILE = "mismatches.log"
 SAVE_INTERVAL = 100
 COMMAND_TIMEOUT = 2
 
+# Standard X11/evdev keycodes for US QWERTY layout
+# This ensures that when VTE asks XKB "what is keycode X?", it gets the expected answer.
 key_map = {
-    # Letters
-    **{chr(c): {'name': chr(c), 'keycode': i} for i, c in enumerate(range(ord('a'), ord('z') + 1), 38)},
-    # Numbers
-    **{chr(c): {'name': chr(c), 'keycode': i} for i, c in enumerate(range(ord('0'), ord('9') + 1), 19)},
+    'a': {'name': 'a', 'keycode': 38}, 'b': {'name': 'b', 'keycode': 56}, 'c': {'name': 'c', 'keycode': 54},
+    'd': {'name': 'd', 'keycode': 40}, 'e': {'name': 'e', 'keycode': 26}, 'f': {'name': 'f', 'keycode': 41},
+    'g': {'name': 'g', 'keycode': 42}, 'h': {'name': 'h', 'keycode': 43}, 'i': {'name': 'i', 'keycode': 31},
+    'j': {'name': 'j', 'keycode': 44}, 'k': {'name': 'k', 'keycode': 45}, 'l': {'name': 'l', 'keycode': 46},
+    'm': {'name': 'm', 'keycode': 58}, 'n': {'name': 'n', 'keycode': 57}, 'o': {'name': 'o', 'keycode': 32},
+    'p': {'name': 'p', 'keycode': 33}, 'q': {'name': 'q', 'keycode': 24}, 'r': {'name': 'r', 'keycode': 27},
+    's': {'name': 's', 'keycode': 39}, 't': {'name': 't', 'keycode': 28}, 'u': {'name': 'u', 'keycode': 30},
+    'v': {'name': 'v', 'keycode': 55}, 'w': {'name': 'w', 'keycode': 25}, 'x': {'name': 'x', 'keycode': 53},
+    'y': {'name': 'y', 'keycode': 29}, 'z': {'name': 'z', 'keycode': 52},
+
+    # Numbers row
+    '1': {'name': '1', 'keycode': 10}, '2': {'name': '2', 'keycode': 11}, '3': {'name': '3', 'keycode': 12},
+    '4': {'name': '4', 'keycode': 13}, '5': {'name': '5', 'keycode': 14}, '6': {'name': '6', 'keycode': 15},
+    '7': {'name': '7', 'keycode': 16}, '8': {'name': '8', 'keycode': 17}, '9': {'name': '9', 'keycode': 18},
+    '0': {'name': '0', 'keycode': 19},
+
     # Top row symbols
     '`': {'name': '`', 'keycode': 49}, '~': {'name': '~', 'keycode': 49},
     '-': {'name': 'minus', 'keycode': 20}, '_': {'name': '_', 'keycode': 20},
@@ -32,14 +46,17 @@ key_map = {
     ',': {'name': 'comma', 'keycode': 59}, '<': {'name': '<', 'keycode': 59},
     '.': {'name': 'period', 'keycode': 60}, '>': {'name': '>', 'keycode': 60},
     '/': {'name': 'slash', 'keycode': 61}, '?': {'name': '?', 'keycode': 61},
-    # Function keys
+    
+    # Function keys (F1=67 in evdev)
     **{f'F{i}': {'name': f'F{i}', 'keycode': 66 + i} for i in range(1, 13)},
+    
     # Control keys
     'Escape': {'name': 'Escape', 'keycode': 9},
     'Tab': {'name': 'Tab', 'keycode': 23},
     'Return': {'name': 'Return', 'keycode': 36},
     'BackSpace': {'name': 'BackSpace', 'keycode': 22},
     'space': {'name': 'space', 'keycode': 65},
+    
     # Navigation
     'Insert': {'name': 'Insert', 'keycode': 118},
     'Delete': {'name': 'Delete', 'keycode': 119},
@@ -47,12 +64,14 @@ key_map = {
     'End': {'name': 'End', 'keycode': 115},
     'Page_Up': {'name': 'Page_Up', 'keycode': 112},
     'Page_Down': {'name': 'Page_Down', 'keycode': 117},
+    
     # Arrows
     'Up': {'name': 'Up', 'keycode': 111},
     'Down': {'name': 'Down', 'keycode': 116},
     'Left': {'name': 'Left', 'keycode': 113},
     'Right': {'name': 'Right', 'keycode': 114},
-    # Keypad
+    
+    # Keypad (NumLock ON usually implies these codes)
     **{f'KP_{i}': {'name': f'KP_{i}', 'keycode': 86 - (9-i) if i!=0 else 90} for i in range(10)},
     'KP_Home': {'name': 'KP_Home', 'keycode': 79},
     'KP_End': {'name': 'KP_End', 'keycode': 87},
@@ -126,9 +145,19 @@ def main():
         print("Error: Testers not found. Please run 'make' first.", file=sys.stderr)
         sys.exit(1)
 
+    # Simplified test set for rapid iteration
+    # mods_to_test = [[]] + [list(c) for i in range(1, 4) for c in itertools.combinations(['--shift', '--ctrl', '--alt'], i)]
+    
+    # Full set
     mods_to_test = [[]] + [list(c) for i in range(1, 4) for c in itertools.combinations(['--shift', '--ctrl', '--alt'], i)]
+    
     locks_to_test = [ [], ['--caps'], ['--num'], ['--caps', '--num'] ]
-    kitty_flags_to_test = range(32)
+    
+    # Test typical flags + full flags
+    # kitty_flags_to_test = range(32)
+    kitty_flags_to_test = [0, 1, 2, 8, 16, 24, 31] # Reduced set for speed if needed, else range(32)
+    kitty_flags_to_test = range(32) 
+
     keys_to_test = list(key_map.values())
     
     all_combinations = list(itertools.product(keys_to_test, mods_to_test, locks_to_test, kitty_flags_to_test))
@@ -144,9 +173,9 @@ def main():
     try:
         for i, (key_info, mods, locks, flags) in enumerate(all_combinations):
             
-            if i > 0 and i % 100 == 0:
+            if i > 0 and i % 500 == 0:
                 percent = (i * 100) // total_tests
-                print(f"\nProgress: {percent}% ({i}/{total_tests})", flush=True)
+                print(f"Progress: {percent}% ({i}/{total_tests})", flush=True)
 
             base_cmd = ['--key', key_info['name']] + mods + locks
             kitty_cmd = [KITTY_TESTER] + base_cmd + ['--kitty-flags', str(flags)]
@@ -175,7 +204,7 @@ def main():
             }
             results.append(test_case)
             
-            if i > 0 and i % (SAVE_INTERVAL * 10) == 0:
+            if i > 0 and i % (SAVE_INTERVAL * 20) == 0:
                 save_results(results)
 
     except KeyboardInterrupt:
