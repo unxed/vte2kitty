@@ -9,20 +9,26 @@ KITTY_CFLAGS = -Wall -Wextra -std=c11
 VTE_CXXFLAGS = -Wall -Wextra -std=c++17 -DVTE_GTK=4 `pkg-config --cflags xkbcommon`
 VTE_LDFLAGS = `pkg-config --libs xkbcommon`
 
+FAR2L_CXXFLAGS = -Wall -Wextra -std=c++17
+
 KITTY_TESTER = $(EXEC_DIR)/kitty_tester
 VTE_TESTER = $(EXEC_DIR)/vte_tester
+FAR2L_TESTER = $(EXEC_DIR)/far2l_tester
 
 .PHONY: all clean
 
-all: $(BUILD_DIR) $(EXEC_DIR) $(KITTY_TESTER) $(VTE_TESTER)
+all: $(BUILD_DIR) $(EXEC_DIR) $(KITTY_TESTER) $(VTE_TESTER) $(FAR2L_TESTER)
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 	mkdir -p $(BUILD_DIR)/kitty
 	mkdir -p $(BUILD_DIR)/vte
+	mkdir -p $(BUILD_DIR)/far2l
 
 $(EXEC_DIR):
 	mkdir -p $(EXEC_DIR)
+
+# Kitty Rules
 
 kitty_test/kitty_encoder_body.inc: source/key_encoding.c kitty_test/extract_kitty.py
 	@echo "=> Generating kitty encoder body..."
@@ -36,6 +42,8 @@ $(KITTY_TESTER): $(BUILD_DIR)/kitty/kitty_tester.o
 	@echo "=> Linking kitty tester..."
 	$(CC) $^ -o $@
 	@echo "-> Built $(KITTY_TESTER)"
+
+# VTE Rules
 
 vte_test/vte_key_press_body.inc: source/vte.cc vte_test/extract_code.py
 	@echo "=> Generating VTE key press body..."
@@ -54,8 +62,23 @@ $(VTE_TESTER): $(BUILD_DIR)/vte/main.o $(BUILD_DIR)/vte/vte_key_tester.o
 	$(CXX) $^ -o $@ $(VTE_LDFLAGS)
 	@echo "-> Built $(VTE_TESTER)"
 
+# Far2l Rules
+
+far2l_test/far2l_key_press_body.inc: source/vtshell_translation_kitty.cpp far2l_test/extract_far2l.py
+	@echo "=> Generating Far2l key press body..."
+	@python3 far2l_test/extract_far2l.py source/vtshell_translation_kitty.cpp
+
+$(BUILD_DIR)/far2l/far2l_tester.o: far2l_test/far2l_tester.cpp far2l_test/far2l_mocks.h far2l_test/far2l_key_press_body.inc
+	@echo "=> Compiling Far2l tester object..."
+	$(CXX) $(FAR2L_CXXFLAGS) -c far2l_test/far2l_tester.cpp -o $@
+
+$(FAR2L_TESTER): $(BUILD_DIR)/far2l/far2l_tester.o
+	@echo "=> Linking Far2l tester..."
+	$(CXX) $^ -o $@
+	@echo "-> Built $(FAR2L_TESTER)"
+
 
 clean:
 	@echo "=> Cleaning build files..."
 	rm -rf $(BUILD_DIR)
-	rm -f vte_test/vte_key_press_body.inc kitty_test/kitty_encoder_body.inc
+	rm -f vte_test/vte_key_press_body.inc kitty_test/kitty_encoder_body.inc far2l_test/far2l_key_press_body.inc

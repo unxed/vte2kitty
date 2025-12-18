@@ -7,15 +7,41 @@ import sys
 import argparse
 from collections import defaultdict
 
-# --- Configuration ---
+# Configuration
 KITTY_TESTER = "./build/bin/kitty_tester"
-VTE_TESTER = "./build/bin/vte_tester"
 RESULTS_FILE = "test_results.json"
 MISMATCH_LOG_FILE = "mismatches.log"
 SAVE_INTERVAL = 100
 COMMAND_TIMEOUT = 2
 
+# Definition of test targets
+# each target defines:
+#  - binary: path to the tester executable
+#  - cmd_builder: function(binary, base_cmd, key_info, flags) -> list of args
+#  - is_fallback: function(output_str) -> bool (returns true if the test should be skipped/considered legacy)
+def build_vte_cmd(binary, base_cmd, key_info, flags):
+    # VTE tester needs the explicit EVDEV keycode
+    return [binary] + base_cmd + ['--keycode', str(key_info['keycode']), '--kitty-flags', str(flags)]
+
+def build_far2l_cmd(binary, base_cmd, key_info, flags):
+    # Far2l tester maps names internally, keycode is ignored
+    return [binary] + base_cmd + ['--kitty-flags', str(flags)]
+
+TARGETS = {
+    'vte': {
+        'binary': './build/bin/vte_tester',
+        'cmd_builder': build_vte_cmd,
+        'is_fallback': lambda out: out == "[LEGACY_FALLBACK]" or out == "[EMPTY]"
+    },
+    'far2l': {
+        'binary': './build/bin/far2l_tester',
+        'cmd_builder': build_far2l_cmd,
+        'is_fallback': lambda out: out == "[EMPTY]"
+    }
+}
+
 # Standard X11/evdev keycodes for US QWERTY layout
+# Used by VTE (requires evdev codes) and generic iteration
 key_map = {
     'a': {'name': 'a', 'keycode': 38}, 'b': {'name': 'b', 'keycode': 56}, 'c': {'name': 'c', 'keycode': 54},
     'd': {'name': 'd', 'keycode': 40}, 'e': {'name': 'e', 'keycode': 26}, 'f': {'name': 'f', 'keycode': 41},
@@ -108,7 +134,7 @@ def format_key_combo(key_info, mods, locks, flags):
     combo_str = "+".join(combo_parts)
     return f"Key: {combo_str}, Flags: {flags}"
 
-def save_results(results):
+def save_results(results, target_name):
     mismatches = [r for r in results if r['status'] == 'mismatch']
 
     with open(RESULTS_FILE, 'w') as f:
@@ -116,11 +142,12 @@ def save_results(results):
         for r in results:
             json_r = r.copy()
             json_r['kitty_out_fmt'] = format_raw_output(json_r.pop('kitty_out'))
-            json_r['vte_out_fmt'] = format_raw_output(json_r.pop('vte_out'))
+            json_r['target_out_fmt'] = format_raw_output(json_r.pop('target_out'))
             json_results.append(json_r)
         json.dump(json_results, f, indent=2)
 
     with open(MISMATCH_LOG_FILE, 'w') as f:
+        f.write(f"Target: {target_name}\n")
         f.write(f"Found {len(mismatches)} mismatches.\n\n")
 
         max_combo_len = 0
@@ -132,18 +159,23 @@ def save_results(results):
         for item in mismatches:
             combo_str = item['combo'].ljust(max_combo_len)
             kitty_str = format_raw_output(item['kitty_out']).ljust(max_kitty_len)
-            vte_str = format_raw_output(item['vte_out'])
-            f.write(f"{combo_str} -> kitty: {kitty_str} | vte: {vte_str}\n")
+            tgt_str = format_raw_output(item['target_out'])
+            f.write(f"{combo_str} -> kitty: {kitty_str} | {target_name}: {tgt_str}\n")
 
 def main():
-    parser = argparse.ArgumentParser(description="Test and compare kitty and VTE key encoders.")
+    parser = argparse.ArgumentParser(description="Test and compare kitty and other terminal key encoders.")
     parser.add_argument("--debug", action="store_true", help="Enable debug output for commands.")
     parser.add_argument("--limit", type=int, default=0, help="Limit the number of test combinations to run.")
-    parser.add_argument("--start-at-percent", type=int, default=0, help="Start tests from a certain percentage of the total combinations (0-99).")
+    parser.add_argument("--start-at-percent", type=int, default=0, help="Start tests from a certain percentage (0-99).")
+    parser.add_argument("--target", default="vte", choices=TARGETS.keys(), help="Select the target implementation to test (default: vte).")
     args = parser.parse_args()
 
-    if not all(os.path.exists(p) for p in [KITTY_TESTER, VTE_TESTER]):
-        print("Error: Testers not found. Please run 'make' first.", file=sys.stderr)
+    target_conf = TARGETS[args.target]
+    if not os.path.exists(KITTY_TESTER):
+        print(f"Error: Kitty tester ({KITTY_TESTER}) not found. Run 'make' first.", file=sys.stderr)
+        sys.exit(1)
+    if not os.path.exists(target_conf['binary']):
+        print(f"Error: Target tester ({target_conf['binary']}) not found. Run 'make' first.", file=sys.stderr)
         sys.exit(1)
 
     mods_to_test = [[]] + [list(c) for i in range(1, 4) for c in itertools.combinations(['--shift', '--ctrl', '--alt'], i)]
@@ -165,7 +197,8 @@ def main():
             all_combinations = all_combinations[start_index:]
             print(f"Starting at {args.start_at_percent}%, skipping first {start_index} combinations.")
 
-    print(f"Starting tests. Combinations to check: {len(all_combinations)}")
+    print(f"Starting tests for target: {args.target}")
+    print(f"Combinations to check: {len(all_combinations)}")
 
     results = []
     mismatch_count = 0
@@ -177,7 +210,6 @@ def main():
         for i_offset, (key_info, mods, locks, flags) in enumerate(all_combinations):
 
             i = start_index + i_offset
-
             key_name = key_info['name']
 
             if i > 0 and i % 500 == 0:
@@ -185,25 +217,27 @@ def main():
                 print(f"Progress: {percent}% ({i}/{total_tests}) | Found {mismatch_count} mismatches", flush=True)
 
             base_cmd = ['--key', key_info['name']] + mods + locks
+            
+            # Build commands
             kitty_cmd = [KITTY_TESTER] + base_cmd + ['--kitty-flags', str(flags)]
-            vte_cmd = [VTE_TESTER] + base_cmd + ['--keycode', str(key_info['keycode']), '--kitty-flags', str(flags)]
+            target_cmd = target_conf['cmd_builder'](target_conf['binary'], base_cmd, key_info, flags)
 
+            # Execution
             kitty_out_raw = run_command(kitty_cmd, args.debug)
-            vte_out_raw = run_command(vte_cmd, args.debug)
+            target_out_raw = run_command(target_cmd, args.debug)
 
             kitty_out_str = format_raw_output(kitty_out_raw)
-            vte_out_str = format_raw_output(vte_out_raw)
+            target_out_str = format_raw_output(target_out_raw)
 
-            status = 'error' # Default to error
+            status = 'error'
 
-            if "[ERROR:" in kitty_out_str or "[ERROR:" in vte_out_str:
+            if "[ERROR:" in kitty_out_str or "[ERROR:" in target_out_str:
                 status = 'error'
             elif kitty_out_str == "[EMPTY]":
                 status = 'skipped_kitty_empty'
-            # Consolidate both fallback conditions for VTE
-            elif vte_out_str == "[LEGACY_FALLBACK]" or vte_out_str == "[EMPTY]":
-                status = 'skipped_vte_fallback'
-            elif kitty_out_str == vte_out_str:
+            elif target_conf['is_fallback'](target_out_str):
+                status = 'skipped_target_fallback'
+            elif kitty_out_str == target_out_str:
                 status = 'match'
             else:
                 status = 'mismatch'
@@ -216,48 +250,44 @@ def main():
                 'combo': format_key_combo(key_info, mods, locks, flags),
                 'status': status,
                 'kitty_out': kitty_out_raw,
-                'vte_out': vte_out_raw,
+                'target_out': target_out_raw,
             }
             results.append(test_case)
 
             if i > 0 and i % (SAVE_INTERVAL * 20) == 0:
                 save_counter += 1
                 print(f" [Save #{save_counter}] Saving intermediate results...")
-                save_results(results)
+                save_results(results, args.target)
 
     except KeyboardInterrupt:
         print("\nTest interrupted by user. Saving current results.")
     finally:
         sys.stdout.write("\n")
         print("Saving final results...")
-        save_results(results)
+        save_results(results, args.target)
 
         matches = len([r for r in results if r['status'] == 'match'])
         mismatches = len([r for r in results if r['status'] == 'mismatch'])
         errors = len([r for r in results if r['status'] == 'error'])
 
-        skipped_kitty_empty = len([r for r in results if r['status'] == 'skipped_kitty_empty'])
-        skipped_vte_fallback = len([r for r in results if r['status'] == 'skipped_vte_fallback'])
-        skipped_total = skipped_kitty_empty + skipped_vte_fallback
+        skipped_kitty = len([r for r in results if r['status'] == 'skipped_kitty_empty'])
+        skipped_target = len([r for r in results if r['status'] == 'skipped_target_fallback'])
+        skipped_total = skipped_kitty + skipped_target
 
         total_keys_tested = len(key_status)
         successful_keys_count = sum(1 for passed in key_status.values() if passed)
 
         print("\n--- Test Summary ---")
+        print(f"Target: {args.target}")
         print(f"Total combinations run: {len(results)} / {total_tests}")
-        print(f"  Matching combinations: {matches}")
-        print(f"  Mismatched combinations: {mismatches}")
-        print(f"  Total skipped: {skipped_total}")
-        print(f"    - Skipped (empty responce from the kitty code): {skipped_kitty_empty}")
-        print(f"    - Skipped (VTE legacy generation used): {skipped_vte_fallback}")
-        print(f"  Errors in test apps: {errors}")
-        print("\n--- Key-based Summary ---")
-        print(f"Total unique keys tested: {total_keys_tested}")
-
+        print(f"  Matches: {matches}")
+        print(f"  Mismatches: {mismatches}")
+        print(f"  Skipped: {skipped_total} (Kitty: {skipped_kitty}, Target: {skipped_target})")
+        print(f"  Errors: {errors}")
         print("\n--- Output Files ---")
         if mismatches or errors:
-            print(f"Mismatch/Error details have been logged to '{MISMATCH_LOG_FILE}'")
-        print(f"Full raw results are in '{RESULTS_FILE}'")
+            print(f"Mismatch details: '{MISMATCH_LOG_FILE}'")
+        print(f"Raw results: '{RESULTS_FILE}'")
 
 if __name__ == "__main__":
     main()
