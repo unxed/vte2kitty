@@ -282,7 +282,9 @@ def main():
         print(f"Total combinations run: {len(results)} / {total_tests}")
         print(f"  Matches: {matches}")
         print(f"  Mismatches: {mismatches}")
-        print(f"  Skipped: {skipped_total} (Kitty: {skipped_kitty}, Target: {skipped_target})")
+        print(f"  Skipped: {skipped_total}")
+        print(f"    Kitty return nothing: {skipped_kitty}");
+        print(f"    Target falled back to legacy generation: {skipped_target}");
         print(f"  Errors: {errors}")
         print("\n--- Output Files ---")
         if mismatches or errors:
