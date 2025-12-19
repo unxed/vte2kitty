@@ -190,7 +190,8 @@ int main(int argc, char** argv) {
             vk == VK_LEFT    || vk == VK_RIGHT  ||
             vk == VK_DIVIDE)
         {
-            ev.dwControlKeyState |= ENHANCED_KEY;
+            if (key_name.rfind("KP_", 0) != 0) // keypad keys are definitely not enhanced
+                ev.dwControlKeyState |= ENHANCED_KEY;
         }
 
         bool shift = (ev.dwControlKeyState & SHIFT_PRESSED);
