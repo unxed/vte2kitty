@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import sys
 import os
+from pathlib import Path
 
 def extract_function_body(source_path, dest_path):
     if not os.path.exists(source_path):
@@ -48,7 +49,83 @@ def extract_function_body(source_path, dest_path):
 
     with open(dest_path, 'w', encoding='utf-8') as f:
         f.writelines(body)
-    
+
+
+    ### magic
+
+    FILE = Path("far2l_test/far2l_key_press_body.inc")
+
+    HEADER = r'''
+/* === AUTO-GENERATED SHIFTED / UNSHIFTED SUPPORT FOR TESTING === */
+
+auto vkToEnChars = [](int vk) -> std::pair<char, char> {
+    // A–Z
+    if (vk >= 'A' && vk <= 'Z')
+        return { char(vk + 32), char(vk) }; // a / A
+
+    // 0–9
+    switch (vk) {
+        case '0': return {'0', ')'};
+        case '1': return {'1', '!'};
+        case '2': return {'2', '@'};
+        case '3': return {'3', '#'};
+        case '4': return {'4', '$'};
+        case '5': return {'5', '%'};
+        case '6': return {'6', '^'};
+        case '7': return {'7', '&'};
+        case '8': return {'8', '*'};
+        case '9': return {'9', '('};
+
+        case VK_OEM_MINUS:      return {'-', '_'};
+        case VK_OEM_PLUS:       return {'=', '+'};
+        case VK_OEM_4:          return {'[', '{'};
+        case VK_OEM_6:          return {']', '}'};
+        case VK_OEM_5:          return {'\\','|'};
+        case VK_OEM_1:          return {';', ':'};
+        case VK_OEM_7:          return {'\'','"'};
+        case VK_OEM_COMMA:      return {',', '<'};
+        case VK_OEM_PERIOD:     return {'.', '>'};
+        case VK_OEM_2:          return {'/', '?'};
+        case VK_OEM_3:          return {'`', '~'};
+        case VK_SPACE:          return {' ', ' '};
+    }
+    return {0, 0}; // не печатающая клавиша
+};
+
+/* === END AUTO-GENERATED === */
+
+'''
+
+    REPL1 = r'''
+	auto [unshifted_src, shifted_src] = vkToEnChars(KeyEvent.wVirtualKeyCode);
+    keycode = unshifted_src;
+    '''.strip()
+
+    REPL2 = r'''
+	auto [unshifted_src, shifted_src] = vkToEnChars(KeyEvent.wVirtualKeyCode);
+    shifted = shifted_src;
+    '''.strip()
+
+
+    text = FILE.read_text(encoding="utf-8")
+
+    if "AUTO-GENERATED SHIFT / UNSHIFT SUPPORT" not in text:
+        text = HEADER + "\n" + text
+
+    text = text.replace(
+        "keycode = towlower(KeyEvent.uChar.UnicodeChar);",
+        REPL1
+    )
+
+    text = text.replace(
+        "shifted = KeyEvent.uChar.UnicodeChar;",
+        REPL2
+    )
+
+    FILE.write_text(text, encoding="utf-8")
+    print("OK: файл обработан")
+
+
     print(f"[*] Extracted far2l logic to '{dest_path}'")
 
 if __name__ == "__main__":
