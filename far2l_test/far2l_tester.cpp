@@ -48,7 +48,7 @@ void init_key_map() {
     key_map["Return"] = { VK_RETURN, '\r', '\r' };
     key_map["BackSpace"] = { VK_BACK, '\x08', '\x08' };
     key_map["space"] = { VK_SPACE, ' ', ' ' };
-    
+
     key_map["Insert"] = { VK_INSERT, 0, 0 };
     key_map["Delete"] = { VK_DELETE, 0, 0 };
     key_map["Home"] = { VK_HOME, 0, 0 };
@@ -70,35 +70,35 @@ void init_key_map() {
     key_map["="] = { VK_OEM_PLUS, '=', '+' };
     key_map["equal"] = { VK_OEM_PLUS, '=', '+' };
     key_map["+"] = { VK_OEM_PLUS, '=', '+' };
-    
+
     key_map["["] = { VK_OEM_4, '[', '{' };
     key_map["bracketleft"] = { VK_OEM_4, '[', '{' };
     key_map["{"] = { VK_OEM_4, '[', '{' };
-    
+
     key_map["]"] = { VK_OEM_6, ']', '}' };
     key_map["bracketright"] = { VK_OEM_6, ']', '}' };
     key_map["}"] = { VK_OEM_6, ']', '}' };
-    
+
     key_map["\\"] = { VK_OEM_5, '\\', '|' };
     key_map["backslash"] = { VK_OEM_5, '\\', '|' };
     key_map["|"] = { VK_OEM_5, '\\', '|' };
-    
+
     key_map[";"] = { VK_OEM_1, ';', ':' };
     key_map["semicolon"] = { VK_OEM_1, ';', ':' };
     key_map[":"] = { VK_OEM_1, ';', ':' };
-    
+
     key_map["'"] = { VK_OEM_7, '\'', '"' };
     key_map["apostrophe"] = { VK_OEM_7, '\'', '"' };
     key_map["\""] = { VK_OEM_7, '\'', '"' };
-    
+
     key_map[","] = { VK_OEM_COMMA, ',', '<' };
     key_map["comma"] = { VK_OEM_COMMA, ',', '<' };
     key_map["<"] = { VK_OEM_COMMA, ',', '<' };
-    
+
     key_map["."] = { VK_OEM_PERIOD, '.', '>' };
     key_map["period"] = { VK_OEM_PERIOD, '.', '>' };
     key_map[">"] = { VK_OEM_PERIOD, '.', '>' };
-    
+
     key_map["/"] = { VK_OEM_2, '/', '?' };
     key_map["slash"] = { VK_OEM_2, '/', '?' };
     key_map["?"] = { VK_OEM_2, '/', '?' };
@@ -120,7 +120,7 @@ void init_key_map() {
     key_map["KP_Subtract"] = { VK_SUBTRACT, '-', '-' };
     key_map["KP_Add"] = { VK_ADD, '+', '+' };
     // key_map["KP_Enter"] = { VK_RETURN, '\r', '\r' }; // Handled by ENHANCED_KEY flag usually
-    
+
     key_map["KP_Home"] = { VK_HOME, 0, 0 };
     key_map["KP_End"] = { VK_END, 0, 0 };
     // Add other nav keys if necessary
@@ -138,7 +138,7 @@ int main(int argc, char** argv) {
     KEY_EVENT_RECORD ev = {};
     ev.bKeyDown = 1;
     ev.wRepeatCount = 1;
-    
+
     int kitty_flags = 0;
     bool is_num = false;
 
@@ -180,7 +180,7 @@ int main(int argc, char** argv) {
     } else if (key_map.count(key_name)) {
         KeyDef def = key_map[key_name];
         ev.wVirtualKeyCode = def.vk;
-        
+
         bool shift = (ev.dwControlKeyState & SHIFT_PRESSED);
         bool ctrl = (ev.dwControlKeyState & (LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED));
         bool alt = (ev.dwControlKeyState & (LEFT_ALT_PRESSED | RIGHT_ALT_PRESSED));
@@ -222,7 +222,7 @@ int main(int argc, char** argv) {
                  // For testing purposes, we stick to VK_NUMPADx unless we want to simulate full driver.
              }
         }
-        
+
     } else {
         std::cerr << "Error: Unknown key " << key_name << std::endl;
         return 1;
