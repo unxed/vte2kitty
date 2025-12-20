@@ -176,15 +176,21 @@ def main():
     parser.add_argument("--limit", type=int, default=0, help="Limit the number of test combinations to run.")
     parser.add_argument("--start-at-percent", type=int, default=0, help="Start tests from a certain percentage (0-99).")
     parser.add_argument("--target", default="vte", choices=TARGETS.keys(), help="Select the target implementation to test (default: vte).")
+    parser.add_argument("--generate-golden", metavar="FILE", help="Generate a golden rules file with reference kitty output only, then exit.")
     args = parser.parse_args()
 
     target_conf = TARGETS[args.target]
-    if not os.path.exists(KITTY_TESTER):
-        print(f"Error: Kitty tester ({KITTY_TESTER}) not found. Run 'make' first.", file=sys.stderr)
-        sys.exit(1)
-    if not os.path.exists(target_conf['binary']):
-        print(f"Error: Target tester ({target_conf['binary']}) not found. Run 'make' first.", file=sys.stderr)
-        sys.exit(1)
+    if not args.generate_golden:
+        if not os.path.exists(KITTY_TESTER):
+            print(f"Error: Kitty tester ({KITTY_TESTER}) not found. Run 'make' first.", file=sys.stderr)
+            sys.exit(1)
+        if not os.path.exists(target_conf['binary']):
+            print(f"Error: Target tester ({target_conf['binary']}) not found. Run 'make' first.", file=sys.stderr)
+            sys.exit(1)
+    else:
+        if not os.path.exists(KITTY_TESTER):
+            print(f"Error: Kitty tester ({KITTY_TESTER}) not found. Run 'make' first.", file=sys.stderr)
+            sys.exit(1)
 
     mods_to_test = [[]] + [list(c) for i in range(1, 4) for c in itertools.combinations(['--shift', '--ctrl', '--alt'], i)]
     locks_to_test = [ [], ['--caps'], ['--num'], ['--caps', '--num'] ]
@@ -204,6 +210,39 @@ def main():
             start_index = (total_tests * args.start_at_percent) // 100
             all_combinations = all_combinations[start_index:]
             print(f"Starting at {args.start_at_percent}%, skipping first {start_index} combinations.")
+
+    if args.generate_golden:
+        print(f"Generating golden rules file: {args.generate_golden}")
+        print(f"Total combinations: {len(all_combinations)}")
+
+        try:
+            with open(args.generate_golden, 'w', encoding='utf-8') as golden_file:
+                for i_offset, (key_info, mods, locks, flags) in enumerate(all_combinations):
+                    i = start_index + i_offset
+                    if i > 0 and i % 500 == 0:
+                        percent = ((i + 1) * 100) // total_tests
+                        print(f"Progress: {percent}% ({i}/{total_tests})", flush=True)
+
+                    base_cmd = ['--key', key_info['name']] + mods + locks
+                    kitty_cmd = [KITTY_TESTER] + base_cmd + ['--kitty-flags', str(flags)]
+                    if 'base_key' in key_info:
+                        kitty_cmd.extend(['--base-key', key_info['base_key']])
+
+                    kitty_out_raw = run_command(kitty_cmd, args.debug)
+                    kitty_out_fmt = format_raw_output(kitty_out_raw)
+
+                    # Reconstruct arg string for the file
+                    # Format: INPUT_ARGS | FLAGS | OUTPUT
+                    input_args_str = " ".join(base_cmd)
+                    if 'base_key' in key_info:
+                        input_args_str += f" --base-key {key_info['base_key']}"
+
+                    golden_file.write(f"{input_args_str} | {flags} | {kitty_out_fmt}\n")
+
+            print(f"Done. Golden rules saved to '{args.generate_golden}'.")
+        except IOError as e:
+            print(f"Error writing to file: {e}", file=sys.stderr)
+        return
 
     print(f"Starting tests for target: {args.target}")
     print(f"Combinations to check: {len(all_combinations)}")

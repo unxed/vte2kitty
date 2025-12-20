@@ -72,6 +72,31 @@ This harness does not include the original source code. You must copy the releva
     *   **`mismatches.log`**: Contains a human-readable diff of every case where kitty and the target implementation disagreed.
     *   **`test_results.json`**: Contains the raw data for all tests.
 
+## Generating Golden Rules
+
+If you need to generate a reference file containing the expected output from the official kitty implementation for every possible key combination (without running comparisons against other terminals), you can use the `--generate-golden` flag.
+
+```bash
+python3 run_tests.py --generate-golden golden_rules.txt
+```
+
+This will run the `kitty_tester` against all defined combinations and save the output to `golden_rules.txt`.
+
+**File Format:**
+Each line represents one test case in the format:
+`INPUT_ARGS | FLAGS | OUTPUT`
+
+*   **INPUT_ARGS**: The command line arguments passed to the tester (e.g., `--key a --ctrl`).
+*   **FLAGS**: The integer value of the kitty keyboard flags.
+*   **OUTPUT**: The resulting escape sequence (with `ESC` representing the `\x1b` byte) or `[EMPTY]`.
+
+**Example:**
+```text
+--key a --ctrl | 1 | ESC[1;5a
+--key F1 | 2 | ESC[1;2P
+--key kp_0 --num | 0 | 0
+```
+
 ---
 
 ## Design Rationale
@@ -88,4 +113,3 @@ Early attempts using tools like `xdotool`, `send_key`, or `xtest` to send events
 *   **Problem:** Very slow, focus stealing, race conditions, and the overhead of the display server made tests flaky and slow. Also, some xtest'ed key combinations may log you out, send you to the kernel console or burn your house. Also, GTK ignores "synthetic" keyboard events completely.
 *   **Decision:** We mock the environment. We created `kitty_mocks.h` and `vte_key_tester.h` to emulate the necessary structs (`GLFWkeyevent`, `GdkEventKey`) and constants.
 *   **Result:** The tests run in a "headless" CLI environment. They are deterministic, reproducible, and extremely fast (thousands of checks per second).
-
