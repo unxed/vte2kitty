@@ -27,6 +27,10 @@ It works by extracting the core key encoding logic from both the **kitty** sourc
 
 In addition to GNOME VTE, the project includes tests for the built-in terminal of the far2l file manager, as well as for the Alacritty terminal. These examples clearly illustrate the possibilities of testing code written in different languages and with different internal architectures: for example, far2l uses the Windows event model with KEY_EVENT_RECORD (which does not support distinguishing between shifted and unshifted fields — note how I worked around this issue if you encounter a similar one), while Alacritty, unlike GNOME VTE and far2l, is written in Rust. These examples should help you if you decide to write an adaptation of this mini-framework for testing any terminal developed for any platform.
 
+### far2l note
+
+Since we have no information about keyboard layouts in far2l, we cannot implement a distinction between shifted and unshifted fields as required by the kitty kb protocol specification. Fortunately, a compromise is possible here, [approved](https://github.com/kovidgoyal/kitty/issues/8620#issuecomment-2878530117) by the author of the specification. Therefore, in the tests I use hardcoded conversion tables for shifted and unshifted values for the English keyboard layout, and a compromise approach for all other cases. This seems like the lesser evil and allows to achieve maximum test coverage.
+
 ## Setup & Prerequisites
 
 ### Dependencies
