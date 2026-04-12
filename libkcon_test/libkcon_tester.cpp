@@ -169,11 +169,14 @@ int main(int argc, char** argv) {
         if (def.ch != 0) {
             bool isLetter = ev.vk >= 'A' && ev.vk <= 'Z';
             bool useShifted = isLetter ? (shift ^ ((ev.control_state & KCON_CAPSLOCK_ON) != 0)) : shift;
-            ev.unicode = useShifted ? def.shift_ch : def.ch;
+            uint32_t actual_char = useShifted ? def.shift_ch : def.ch;
+
+            // Following kitty protocol: 'unicode' field represents the identity of the key (unshifted)
+            ev.unicode = def.ch;
 
             bool has_mods_that_prevent_text = (ctrl || alt); // Simple emulation of OS text gen rule
             if (!has_mods_that_prevent_text) {
-                ev.k_text = ev.unicode;
+                ev.k_text = actual_char;
             }
 
             if (ctrl && isalpha(def.ch)) {
@@ -210,7 +213,7 @@ int main(int argc, char** argv) {
     char buf[256];
     size_t len = kcon_write_kitty(&ev, kitty_flags, buf, sizeof(buf));
     if (len > 0) {
-        std::cout << buf;
+        std::cout.write(buf, len);
     } else {
         std::cout << "[EMPTY]";
     }
