@@ -10,3 +10,5 @@ far2l_test/far2l_key_press_body.inc
 alacritty_test/alacritty_extracted.rs
 mismatches.log
 test_results.json
+source/kcon.c
+source/kcon.h
