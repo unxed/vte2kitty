@@ -27,6 +27,9 @@ def build_alacritty_cmd(binary, base_cmd, key_info, flags):
     # Alacritty tester maps names internally based on the key name
     return [binary] + base_cmd + ['--kitty-flags', str(flags)]
 
+def build_libkcon_cmd(binary, base_cmd, key_info, flags):
+    return [binary] + base_cmd + ['--kitty-flags', str(flags)]
+
 TARGETS = {
     'vte': {
         'binary': './build/bin/vte_tester',
@@ -41,6 +44,11 @@ TARGETS = {
     'alacritty': {
         'binary': './build/bin/alacritty_tester',
         'cmd_builder': build_alacritty_cmd,
+        'is_fallback': lambda out: out == "[EMPTY]"
+    },
+    'libkcon': {
+        'binary': './build/bin/libkcon_tester',
+        'cmd_builder': build_libkcon_cmd,
         'is_fallback': lambda out: out == "[EMPTY]"
     }
 }

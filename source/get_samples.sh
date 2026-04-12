@@ -11,3 +11,7 @@ wget https://raw.githubusercontent.com/elfmz/far2l/b9702f965384b8b227e6e7c0da0fa
 #
 rm keyboard.rs
 wget https://raw.githubusercontent.com/alacritty/alacritty/18372031d1f1bda853b2027b7ef1c75b45942829/alacritty/src/input/keyboard.rs
+#
+mkdir -p ../libkcon/include ../libkcon/src
+wget https://raw.githubusercontent.com/unxed/libkcon/main/include/kcon.h
+wget https://raw.githubusercontent.com/unxed/libkcon/main/src/kcon.c

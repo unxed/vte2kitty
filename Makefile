@@ -16,10 +16,11 @@ KITTY_TESTER = $(EXEC_DIR)/kitty_tester
 VTE_TESTER = $(EXEC_DIR)/vte_tester
 FAR2L_TESTER = $(EXEC_DIR)/far2l_tester
 ALACRITTY_TESTER = $(EXEC_DIR)/alacritty_tester
+LIBKCON_TESTER = $(EXEC_DIR)/libkcon_tester
 
 .PHONY: all clean
 
-all: $(BUILD_DIR) $(EXEC_DIR) $(KITTY_TESTER) $(VTE_TESTER) $(FAR2L_TESTER) $(ALACRITTY_TESTER)
+all: $(BUILD_DIR) $(EXEC_DIR) $(KITTY_TESTER) $(VTE_TESTER) $(FAR2L_TESTER) $(ALACRITTY_TESTER) $(LIBKCON_TESTER)
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
@@ -27,6 +28,7 @@ $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)/vte
 	mkdir -p $(BUILD_DIR)/far2l
 	mkdir -p $(BUILD_DIR)/alacritty
+	mkdir -p $(BUILD_DIR)/libkcon
 
 $(EXEC_DIR):
 	mkdir -p $(EXEC_DIR)
@@ -91,6 +93,21 @@ $(ALACRITTY_TESTER): alacritty_test/alacritty_tester.rs alacritty_test/alacritty
 	$(RUSTC) alacritty_test/alacritty_tester.rs -o $@
 	@echo "-> Built $(ALACRITTY_TESTER)"
 
+# Libkcon Rules
+
+
+$(BUILD_DIR)/libkcon/libkcon_tester.o: libkcon_test/libkcon_tester.cpp
+	@echo "=> Compiling libkcon tester object..."
+	$(CXX) -Wall -Wextra -std=c++11 -Isource -c $< -o $@
+
+$(BUILD_DIR)/libkcon/kcon.o: source/kcon.c
+	@echo "=> Compiling libkcon object..."
+	$(CC) -Wall -Wextra -std=c99 -Isource -c $< -o $@
+
+$(LIBKCON_TESTER): $(BUILD_DIR)/libkcon/libkcon_tester.o $(BUILD_DIR)/libkcon/kcon.o
+	@echo "=> Linking libkcon tester..."
+	$(CXX) $^ -o $@
+	@echo "-> Built $(LIBKCON_TESTER)"
 clean:
 	@echo "=> Cleaning build files..."
 	rm -rf $(BUILD_DIR)
